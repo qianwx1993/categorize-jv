@@ -1,0 +1,29 @@
+{
+  "dimensions": ["series", "actor", "theme"], // 分类维度，按顺序表示优先级（越靠前越优先）；一个文件同时命中多个维度时，只取最前面的作为最终分类
+  "rulesFile": "rules.json", // 独立规则文件（分类关键词数据，经常增改，故与本设置文件分开）；相对路径相对于本配置文件所在目录
+  "outputDir": "categorized", // 分类结果输出目录；相对路径=相对于被扫描目录，也可写绝对路径；文件移动到 <outputDir>/<分类名>/
+  "ignoreHidden": true, // 是否忽略隐藏文件（以 . 开头的文件/目录）
+  "ignoreNames": [".DS_Store"], // 按文件名精确忽略的系统垃圾文件
+  "minSizeBytes": 0, // 小于该大小(字节)的文件不处理，0=不限；1048576=1MB
+  "extensionMode": "OFF", // 扩展名过滤：OFF=不过滤 / WHITELIST=只处理 extensions 中列出的 / BLACKLIST=不处理 extensions 中列出的
+  "extensions": [".mp4", ".mkv", ".avi"], // 扩展名列表(配合上面模式)，带不带点都行，大小写不敏感
+  "conflictStrategy": "RENAME", // 目标已存在同名文件时：RENAME=改名如“教父1 (2).mp4”(默认,永不覆盖) / SKIP=跳过 / OVERWRITE=覆盖(危险)
+  "cleanEmptyDirs": false, // 移动完成后是否顺手删除变空的原目录
+  "lowConfidenceThreshold": 0.7, // 低置信度阈值(0~1)，低于此值报告中标[低置信度]；规则命中0.9，模型命中0.6
+  "model": { // 规则层判不出来时，是否调用外部/私有化大模型辅助分类
+    "enabled": false, // true=启用模型兜底；false=只用规则，判不出的进“未分类”
+    // provider：openai=OpenAI Chat Completions 兼容协议(OpenAI/通义/DeepSeek/Kimi/Ollama 通用，推荐)
+    //           http=自定义轻量协议(请求 {"name":"文件名"}，响应 {"hits":[{"dimension":"series","category":"x"}]})
+    //           none=不接
+    "provider": "openai",
+    // openai 填 chat/completions 完整地址：
+    //   OpenAI  : https://api.openai.com/v1/chat/completions
+    //   通义    : https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+    //   DeepSeek: https://api.deepseek.com/v1/chat/completions
+    //   Ollama  : http://localhost:11434/v1/chat/completions
+    "endpoint": "https://api.openai.com/v1/chat/completions",
+    "model": "gpt-4o-mini", // openai 模型名，如 gpt-4o-mini / qwen-plus / deepseek-chat / llama3（Ollama）
+    "apiKey": "", // API 密钥直接写这里(Bearer 头)，如 "sk-xxxx"；⚠️本配置文件请勿提交 git 或分享；本地模型(Ollama)留空 ""
+    "apiKeyEnv": "CATEGORIZE_MODEL_API_KEY" // 也可从该环境变量读取密钥；apiKey 非空时优先用上面的 apiKey；本地模型留空 ""
+  }
+}
