@@ -151,7 +151,7 @@ public class AppConfig {
     }
 
     public static class ModelConfig {
-        private boolean enabled = false;
+        private boolean enabled = true;
         /** none / http(自定义协议) / openai(OpenAI 兼容协议，含 Ollama) */
         private String provider = "none";
         /** http: 完整接口地址；openai: chat/completions 地址，如 https://api.openai.com/v1/chat/completions */
@@ -162,6 +162,12 @@ public class AppConfig {
         private String apiKey = "";
         /** 或从该环境变量读取密钥；apiKey 非空时优先用 apiKey */
         private String apiKeyEnv = "";
+        /** 或从本地文件读取密钥（推荐）：相对路径相对于配置文件所在目录；该文件应加入 .gitignore */
+        private String apiKeyFile = "";
+        /** 自定义系统提示词文件：相对路径相对于配置文件所在目录；留空用内置提示词。支持 {dimensions} 占位符 */
+        private String systemPromptFile = "";
+        /** 运行时从 systemPromptFile 读入的提示词，不要求写在配置 JSON 中 */
+        private String systemPrompt = "";
 
         public boolean isEnabled() {
             return enabled;
@@ -209,6 +215,30 @@ public class AppConfig {
 
         public void setApiKeyEnv(String apiKeyEnv) {
             this.apiKeyEnv = apiKeyEnv;
+        }
+
+        public String getApiKeyFile() {
+            return apiKeyFile;
+        }
+
+        public void setApiKeyFile(String apiKeyFile) {
+            this.apiKeyFile = apiKeyFile;
+        }
+
+        public String getSystemPromptFile() {
+            return systemPromptFile;
+        }
+
+        public void setSystemPromptFile(String systemPromptFile) {
+            this.systemPromptFile = systemPromptFile;
+        }
+
+        public String getSystemPrompt() {
+            return systemPrompt;
+        }
+
+        public void setSystemPrompt(String systemPrompt) {
+            this.systemPrompt = systemPrompt;
         }
     }
 }

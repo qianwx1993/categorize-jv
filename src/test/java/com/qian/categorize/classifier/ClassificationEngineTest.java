@@ -59,7 +59,7 @@ class ClassificationEngineTest {
     }
 
     @Test
-    void modelFallbackWhenRulesEmpty() {
+    void modelFillsDimensionsWhenRulesEmpty() {
         AppConfig config = configWithRules();
         config.getModel().setEnabled(true);
         ClassificationEngine engine = new ClassificationEngine(config, new ModelClient() {
@@ -72,26 +72,43 @@ class ClassificationEngineTest {
 
         ReportEntry entry = engine.classify(file("some-movie.mp4"));
 
-        // 文件名无规则命中，走模型；模型建议归属 actor 维度
+        // 文件名无规则命中，采用模型建议的 actor 维度
         assertEquals("阿尔·帕西诺", entry.getCategory());
         assertTrue(entry.isLowConfidence(), "模型置信度低于默认阈值 0.7，应标低置信度");
     }
 
     @Test
-    void modelNotCalledWhenRuleHits() {
+    void modelAlwaysCalledAndSupplementsOtherDimensions() {
         AppConfig config = configWithRules();
         config.getModel().setEnabled(true);
-        final boolean[] called = {false};
+        final int[] calls = {0};
         ClassificationEngine engine = new ClassificationEngine(config, new ModelClient() {
             @Override
             public List<CategoryHit> suggest(ScannedFile f) {
-                called[0] = true;
-                return Collections.emptyList();
+                calls[0]++;
+                // 模型同时给出 series 和 actor 两个维度
+                return Arrays.asList(
+                        new CategoryHit("series", "模型猜的系列", 0.6, "MODEL"),
+                        new CategoryHit("actor", "阿尔·帕西诺", 0.6, "MODEL"));
             }
         });
 
-        engine.classify(file("Godfather.1972.mp4"));
+        ReportEntry entry = engine.classify(file("Godfather.1972.mp4"));
 
-        assertFalse(called[0], "规则已命中时不应调用模型");
+        assertEquals(1, calls[0], "模型启用时即使规则命中也要调用模型");
+        // series 规则已命中 → 以规则为准；actor 由模型补充
+        assertEquals("教父系列", entry.getCategory(), "series 维度规则优先，不被模型覆盖");
+        assertEquals(2, entry.getHits().size(), "规则的 series + 模型补充的 actor");
+        boolean actorFromModel = false;
+        for (CategoryHit hit : entry.getHits()) {
+            if ("actor".equals(hit.getDimension())) {
+                actorFromModel = "阿尔·帕西诺".equals(hit.getCategory())
+                        && "MODEL".equals(hit.getSource());
+            }
+            if ("series".equals(hit.getDimension())) {
+                assertEquals("教父系列", hit.getCategory());
+            }
+        }
+        assertTrue(actorFromModel, "actor 维度应采用模型补充结果");
     }
 }

@@ -5,7 +5,7 @@ import java.util.List;
 
 /**
  * 报告中一个文件的分类结果。category 为按维度优先级选出的唯一目标分类，
- * 可在 confirm 阶段被人工修改；excluded=true 表示本次不处理。
+ * 可在 apply 前人工修改；excluded=true 表示本次不处理。
  */
 public class ReportEntry {
 

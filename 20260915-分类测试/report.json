@@ -1,0 +1,214 @@
+{
+  "rootDir" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试",
+  "outputDir" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/categorized",
+  "createdAt" : "2026-09-16 00:30:10",
+  "entries" : [ {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/卖拐赵本山.ma4",
+    "name" : "卖拐赵本山.ma4",
+    "size" : 0,
+    "category" : "赵本山",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ {
+      "dimension" : "actor",
+      "category" : "赵本山",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    } ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/走向共和（1）.mp4",
+    "name" : "走向共和（1）.mp4",
+    "size" : 0,
+    "category" : "电视剧",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ {
+      "dimension" : "series",
+      "category" : "电视剧",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    }, {
+      "dimension" : "theme",
+      "category" : "历史",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    } ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/赵本山-落叶归根.mp4",
+    "name" : "赵本山-落叶归根.mp4",
+    "size" : 0,
+    "category" : "赵本山",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ {
+      "dimension" : "actor",
+      "category" : "赵本山",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    } ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/report.json",
+    "name" : "report.json",
+    "size" : 5029,
+    "category" : "未分类",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/喜宴.mp4",
+    "name" : "喜宴.mp4",
+    "size" : 0,
+    "category" : "家庭",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ {
+      "dimension" : "theme",
+      "category" : "家庭",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    } ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/report.md",
+    "name" : "report.md",
+    "size" : 1071,
+    "category" : "未分类",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/李安饮食男女.mp4",
+    "name" : "李安饮食男女.mp4",
+    "size" : 0,
+    "category" : "美食",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ {
+      "dimension" : "theme",
+      "category" : "美食",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    } ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/走向共和（10）.mp4",
+    "name" : "走向共和（10）.mp4",
+    "size" : 0,
+    "category" : "电视剧",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ {
+      "dimension" : "series",
+      "category" : "电视剧",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    } ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/教父3.mp4",
+    "name" : "教父3.mp4",
+    "size" : 0,
+    "category" : "教父系列",
+    "excluded" : false,
+    "lowConfidence" : false,
+    "hits" : [ {
+      "dimension" : "series",
+      "category" : "教父系列",
+      "confidence" : 0.9,
+      "source" : "RULE"
+    } ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/新建文件.txt",
+    "name" : "新建文件.txt",
+    "size" : 273,
+    "category" : "未分类",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/教父2.mp4",
+    "name" : "教父2.mp4",
+    "size" : 0,
+    "category" : "教父系列",
+    "excluded" : false,
+    "lowConfidence" : false,
+    "hits" : [ {
+      "dimension" : "series",
+      "category" : "教父系列",
+      "confidence" : 0.9,
+      "source" : "RULE"
+    } ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/教父1.mp4",
+    "name" : "教父1.mp4",
+    "size" : 0,
+    "category" : "教父系列",
+    "excluded" : false,
+    "lowConfidence" : false,
+    "hits" : [ {
+      "dimension" : "series",
+      "category" : "教父系列",
+      "confidence" : 0.9,
+      "source" : "RULE"
+    } ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/大明王朝1566.mp4",
+    "name" : "大明王朝1566.mp4",
+    "size" : 0,
+    "category" : "电视剧",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ {
+      "dimension" : "series",
+      "category" : "电视剧",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    }, {
+      "dimension" : "theme",
+      "category" : "历史",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    } ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/report.xlsx",
+    "name" : "report.xlsx",
+    "size" : 5446,
+    "category" : "未分类",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/走向共和（3）.mp4",
+    "name" : "走向共和（3）.mp4",
+    "size" : 0,
+    "category" : "电视剧",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ {
+      "dimension" : "series",
+      "category" : "电视剧",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    }, {
+      "dimension" : "theme",
+      "category" : "历史",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    } ]
+  }, {
+    "path" : "/Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/走向共和（2）.mp4",
+    "name" : "走向共和（2）.mp4",
+    "size" : 0,
+    "category" : "电视剧",
+    "excluded" : false,
+    "lowConfidence" : true,
+    "hits" : [ {
+      "dimension" : "series",
+      "category" : "电视剧",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    }, {
+      "dimension" : "theme",
+      "category" : "历史",
+      "confidence" : 0.6,
+      "source" : "MODEL"
+    } ]
+  } ]
+}

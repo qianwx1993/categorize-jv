@@ -4,14 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 分类报告：scan 后生成，JSON 可编辑，confirm 后 confirmed=true 才能 apply。
+ * 分类报告：report 生成，JSON 可人工编辑（改分类/排除），随后直接 apply。
  */
 public class CategorizeReport {
 
     private String rootDir;
     private String outputDir;
     private String createdAt;
-    private boolean confirmed;
     private List<ReportEntry> entries = new ArrayList<ReportEntry>();
 
     public String getRootDir() {
@@ -36,14 +35,6 @@ public class CategorizeReport {
 
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public boolean isConfirmed() {
-        return confirmed;
-    }
-
-    public void setConfirmed(boolean confirmed) {
-        this.confirmed = confirmed;
     }
 
     public List<ReportEntry> getEntries() {

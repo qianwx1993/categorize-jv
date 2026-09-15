@@ -44,7 +44,6 @@ class ApplyRollbackIntegrationTest {
 
         AppConfig config = baseConfig(root);
         CategorizeReport report = classify(root, config);
-        report.setConfirmed(true);
         assertEquals("教父系列", report.getEntries().get(0).getCategory());
 
         FileMover mover = new FileMover(config);
@@ -88,8 +87,6 @@ class ApplyRollbackIntegrationTest {
                 e.setExcluded(true);
             }
         }
-        report.setConfirmed(true);
-
         BatchManifest manifest = new FileMover(config).newBatch(report);
         List<ManifestEntry> results = new FileMover(config).apply(report, manifest);
 
@@ -100,18 +97,6 @@ class ApplyRollbackIntegrationTest {
         // 已有文件内容不被覆盖
         assertArrayEquals(original, Files.readAllBytes(existing));
         assertArrayEquals(new byte[]{1, 2, 3}, Files.readAllBytes(moved));
-    }
-
-    @Test
-    void applyRejectsWithoutConfirmation(@TempDir Path root) throws Exception {
-        Path source = root.resolve("教父1.mp4");
-        Files.write(source, new byte[]{1});
-
-        AppConfig config = baseConfig(root);
-        CategorizeReport report = classify(root, config);
-        assertFalse(report.isConfirmed());
-        // apply 的确认门控在 CLI 层；此处直接确认未确认报告的语义不变
-        assertEquals("教父系列", report.getEntries().get(0).getCategory());
     }
 
     private CategorizeReport classify(Path root, AppConfig config) throws Exception {

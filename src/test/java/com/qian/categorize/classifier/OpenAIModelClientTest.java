@@ -80,6 +80,28 @@ class OpenAIModelClientTest {
     }
 
     @Test
+    void parsesMultiDimensionHitsArray() {
+        responseBody = "{\"choices\":[{\"message\":{\"content\":"
+                + "\"{\\\"hits\\\":[{\\\"dimension\\\":\\\"series\\\",\\\"category\\\":\\\"教父系列\\\"},"
+                + "{\\\"dimension\\\":\\\"actor\\\",\\\"category\\\":\\\"阿尔·帕西诺\\\"},"
+                + "{\\\"dimension\\\":\\\"color\\\",\\\"category\\\":\\\"无效维度被过滤\\\"}]}\"}}]}";
+
+        List<CategoryHit> hits = client().suggest(file());
+
+        assertEquals(2, hits.size(), "无效维度的条目应被过滤");
+        assertEquals("series", hits.get(0).getDimension());
+        assertEquals("教父系列", hits.get(0).getCategory());
+        assertEquals("actor", hits.get(1).getDimension());
+        assertEquals("阿尔·帕西诺", hits.get(1).getCategory());
+    }
+
+    @Test
+    void emptyHitsArrayYieldsEmpty() {
+        responseBody = "{\"choices\":[{\"message\":{\"content\":\"{\\\"hits\\\":[]}\"}}]}";
+        assertTrue(client().suggest(file()).isEmpty());
+    }
+
+    @Test
     void nullDimensionYieldsEmpty() {
         responseBody = "{\"choices\":[{\"message\":{\"content\":"
                 + "\"{\\\"dimension\\\": null, \\\"category\\\": null}\"}}]}";
@@ -109,6 +131,18 @@ class OpenAIModelClientTest {
     void serverErrorDegradesToEmpty() {
         responseStatus = 500;
         assertTrue(client().suggest(file()).isEmpty());
+    }
+
+    @Test
+    void customSystemPromptIsUsedInRequestBody() {
+        responseBody = "{\"choices\":[{\"message\":{\"content\":\"{\\\"hits\\\":[]}\"}}]}";
+
+        OpenAIModelClient c = new OpenAIModelClient(url, "test-model", null,
+                null, Arrays.asList("series", "actor", "theme"),
+                "这是自定义提示词 [series, actor, theme]");
+        c.suggest(file());
+
+        assertTrue(requestBody.get().contains("这是自定义提示词"));
     }
 
     @Test

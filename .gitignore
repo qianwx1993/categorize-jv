@@ -16,3 +16,10 @@ target/
 *.jar
 !.mvn/wrapper/maven-wrapper.jar
 /提示词/
+
+# 模型 API 密钥和自定义系统提示词文件（本地私有，禁止提交）
+model-api-key.txt
+model-system-prompt.txt
+*.key
+*api-key*.txt
+*system-prompt*.txt

@@ -93,7 +93,6 @@ public class ReportManager {
         sb.append("- 待处理：").append(countActive(report)).append('\n');
         sb.append("- 总大小：").append(humanSize(totalSize)).append('\n');
         sb.append("- **低置信度文件：").append(lowConfidence).append("（请重点复核）**\n");
-        sb.append("- 报告状态：").append(report.isConfirmed() ? "已确认" : "未确认").append('\n');
         sb.append("\n## 目标目录预览\n\n");
         sb.append("```\n");
         for (Map.Entry<String, List<ReportEntry>> cat : byCategory.entrySet()) {

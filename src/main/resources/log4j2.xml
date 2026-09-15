@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="OFF">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_ERR"/>
+    </Appenders>
+    <Loggers>
+        <!-- POI 内部日志只放 ERROR 级别，避免污染工具自身的命令行输出 -->
+        <Root level="ERROR">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

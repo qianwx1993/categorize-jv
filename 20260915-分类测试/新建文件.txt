@@ -1,0 +1,1 @@
+mvn -q exec:java -Dexec.mainClass=com.qian.categorize.Application -Dexec.args="report /Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试 --report /Users/qian/Document_Management/文件管理/99.临时文件/20260915-分类测试/report.json"
