@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import com.qian.categorize.util.Progress;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,13 +35,25 @@ public class RollbackService {
     }
 
     public RollbackResult rollback(BatchManifest manifest) {
+        return rollback(manifest, Progress.NONE);
+    }
+
+    /** 带进度/取消的回滚版本：当前文件还原完成后响应取消。 */
+    public RollbackResult rollback(BatchManifest manifest, Progress progress) {
         RollbackResult result = new RollbackResult();
         // 逆序还原，尽量贴近执行前状态
         List<ManifestEntry> entries = manifest.getEntries();
+        int total = entries.size();
         for (int i = entries.size() - 1; i >= 0; i--) {
             ManifestEntry e = entries.get(i);
+            if (progress != null && progress.isCancelled()) {
+                break;
+            }
             if (!FileMover.DONE.equals(e.getStatus())) {
                 continue;
+            }
+            if (progress != null) {
+                progress.progress(total - i, total, "正在还原: " + new File(e.getTargetPath()).getName());
             }
             Path target = new File(e.getTargetPath()).toPath();
             Path source = new File(e.getSourcePath()).toPath();

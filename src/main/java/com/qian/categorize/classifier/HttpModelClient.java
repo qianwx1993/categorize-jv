@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.qian.categorize.config.ConfigLoader;
 import com.qian.categorize.model.CategoryHit;
 import com.qian.categorize.model.ScannedFile;
+import com.qian.categorize.util.HttpsTrust;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -50,6 +51,8 @@ public class HttpModelClient implements ModelClient {
         HttpURLConnection conn = null;
         try {
             conn = (HttpURLConnection) new URL(endpoint).openConnection();
+            // 老版本内置 JRE 的 cacerts 可能缺新根证书，追加信任 Windows 系统证书库
+            HttpsTrust.apply(conn);
             conn.setRequestMethod("POST");
             conn.setConnectTimeout(TIMEOUT_MS);
             conn.setReadTimeout(TIMEOUT_MS);

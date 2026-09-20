@@ -6,12 +6,14 @@ import com.qian.categorize.config.ConfigLoader;
 import com.qian.categorize.model.CategorizeReport;
 import com.qian.categorize.model.ReportEntry;
 import com.qian.categorize.model.ScannedFile;
+import com.qian.categorize.util.Progress;
 
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.concurrent.CancellationException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,13 +33,33 @@ public class ReportManager {
     }
 
     public CategorizeReport build(File rootDir, List<ScannedFile> files) {
+        return build(rootDir, files, Progress.NONE);
+    }
+
+    /** 带进度/取消的构建版本；在每个文件分类之间检查取消标志。 */
+    public CategorizeReport build(File rootDir, List<ScannedFile> files, Progress progress) {
         CategorizeReport report = new CategorizeReport();
         report.setRootDir(rootDir.getAbsolutePath());
         report.setOutputDir(resolveOutputDir(rootDir).getAbsolutePath());
         report.setCreatedAt(now());
-        List<ReportEntry> entries = new ArrayList<ReportEntry>();
-        for (ScannedFile f : files) {
-            entries.add(engine.classify(f));
+        int total = files.size();
+        if (progress != null && progress.isCancelled()) {
+            throw new CancellationException("分类分析已取消");
+        }
+        // 模型批量归类：一次请求看到全部文件名，通观全局后归纳分类
+        if (progress != null && total > 0) {
+            progress.progress(0, total, "正在让模型通览全部文件并归纳分类…");
+        }
+        List<ReportEntry> classified = engine.classifyAll(files);
+        List<ReportEntry> entries = new ArrayList<ReportEntry>(total);
+        for (int i = 0; i < total; i++) {
+            if (progress != null && progress.isCancelled()) {
+                throw new CancellationException("分类分析已取消");
+            }
+            entries.add(classified.get(i));
+            if (progress != null) {
+                progress.progress(i + 1, total, "正在分析: " + files.get(i).getName());
+            }
         }
         report.setEntries(entries);
         return report;
@@ -64,12 +86,20 @@ public class ReportManager {
     }
 
     public void writeMarkdown(CategorizeReport report, File mdFile) throws IOException {
+        // 真正会移动的文件按分类分组；未分类文件单独收集（保持原位，不移动）
         Map<String, List<ReportEntry>> byCategory =
                 new LinkedHashMap<String, List<ReportEntry>>();
+        List<ReportEntry> kept = new ArrayList<ReportEntry>();
         long lowConfidence = 0;
-        long totalSize = 0;
+        long moveSize = 0;
+        long excluded = 0;
         for (ReportEntry e : report.getEntries()) {
             if (e.isExcluded()) {
+                excluded++;
+                continue;
+            }
+            if (e.isUncategorized()) {
+                kept.add(e);
                 continue;
             }
             List<ReportEntry> list = byCategory.get(e.getCategory());
@@ -78,7 +108,7 @@ public class ReportManager {
                 byCategory.put(e.getCategory(), list);
             }
             list.add(e);
-            totalSize += e.getSize();
+            moveSize += e.getSize();
             if (e.isLowConfidence()) {
                 lowConfidence++;
             }
@@ -90,10 +120,12 @@ public class ReportManager {
         sb.append("- 扫描目录：").append(report.getRootDir()).append('\n');
         sb.append("- 目标目录：").append(report.getOutputDir()).append('\n');
         sb.append("- 文件总数：").append(report.getEntries().size()).append('\n');
-        sb.append("- 待处理：").append(countActive(report)).append('\n');
-        sb.append("- 总大小：").append(humanSize(totalSize)).append('\n');
+        sb.append("- 待移动：").append(countMove(report)).append('\n');
+        sb.append("- 未分类（保持原位，不移动）：").append(kept.size()).append('\n');
+        sb.append("- 已排除：").append(excluded).append('\n');
+        sb.append("- 待移动总大小：").append(humanSize(moveSize)).append('\n');
         sb.append("- **低置信度文件：").append(lowConfidence).append("（请重点复核）**\n");
-        sb.append("\n## 目标目录预览\n\n");
+        sb.append("\n## 目标目录预览（仅待移动文件）\n\n");
         sb.append("```\n");
         for (Map.Entry<String, List<ReportEntry>> cat : byCategory.entrySet()) {
             sb.append(cat.getKey()).append('/').append('\n');
@@ -107,6 +139,17 @@ public class ReportManager {
         }
         sb.append("```\n");
 
+        if (!kept.isEmpty()) {
+            sb.append("\n## 保持原位（未分类，执行时不会移动）\n\n");
+            for (ReportEntry e : kept) {
+                sb.append("- ").append(e.getPath());
+                if (e.isLowConfidence()) {
+                    sb.append("  [低置信度]");
+                }
+                sb.append('\n');
+            }
+        }
+
         File parent = mdFile.getParentFile();
         if (parent != null) {
             parent.mkdirs();
@@ -115,10 +158,11 @@ public class ReportManager {
                 sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
-    private long countActive(CategorizeReport report) {
+    /** 真正会移动的文件数：未排除且有明确分类（未分类保持原位，不计入）。 */
+    private long countMove(CategorizeReport report) {
         long n = 0;
         for (ReportEntry e : report.getEntries()) {
-            if (!e.isExcluded()) {
+            if (!e.isExcluded() && !e.isUncategorized()) {
                 n++;
             }
         }

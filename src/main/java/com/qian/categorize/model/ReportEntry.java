@@ -6,8 +6,12 @@ import java.util.List;
 /**
  * 报告中一个文件的分类结果。category 为按维度优先级选出的唯一目标分类，
  * 可在 apply 前人工修改；excluded=true 表示本次不处理。
+ * category 为「未分类」（或空）时，apply 不移动文件，保持原位。
  */
 public class ReportEntry {
+
+    /** 未分类的固定标识；命中不到任何维度时使用，apply 时此类文件保持原位。 */
+    public static final String UNCATEGORIZED = "未分类";
 
     private String path;
     private String name;
@@ -59,6 +63,12 @@ public class ReportEntry {
 
     public boolean isLowConfidence() {
         return lowConfidence;
+    }
+
+    /** 是否未分类：分类名为空或等于固定标识「未分类」——执行移动时保持在原路径，不移动。 */
+    public boolean isUncategorized() {
+        String c = category == null ? "" : category.trim();
+        return c.isEmpty() || UNCATEGORIZED.equals(c);
     }
 
     public void setLowConfidence(boolean lowConfidence) {

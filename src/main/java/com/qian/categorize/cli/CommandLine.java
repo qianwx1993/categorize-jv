@@ -1,13 +1,10 @@
 package com.qian.categorize.cli;
 
 import com.qian.categorize.classifier.ClassificationEngine;
-import com.qian.categorize.classifier.HttpModelClient;
 import com.qian.categorize.classifier.ModelClient;
 import com.qian.categorize.classifier.NullModelClient;
-import com.qian.categorize.classifier.OpenAIModelClient;
 import com.qian.categorize.config.AppConfig;
 import com.qian.categorize.config.ConfigLoader;
-import com.qian.categorize.config.Rules;
 import com.qian.categorize.model.BatchManifest;
 import com.qian.categorize.model.CategorizeReport;
 import com.qian.categorize.model.ManifestEntry;
@@ -18,11 +15,15 @@ import com.qian.categorize.ops.RollbackService;
 import com.qian.categorize.report.ExcelReportWriter;
 import com.qian.categorize.report.ReportManager;
 import com.qian.categorize.scanner.FileScanner;
+import com.qian.categorize.scanner.ScanResult;
+import com.qian.categorize.service.CategorizeService;
+import com.qian.categorize.service.ConfigFiles;
+import com.qian.categorize.service.ModelProtocols;
+import com.qian.categorize.util.Templates;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -73,77 +74,36 @@ public class CommandLine {
         if (!dir.isDirectory()) {
             throw new IllegalArgumentException("不是目录: " + dir);
         }
-        copyTemplate("/templates/categorize-config.json", new File(dir, DEFAULT_CONFIG_NAME));
-        writeIfAbsent(new File(dir, "rules.json"), DEFAULT_RULES_JSON);
-        copyTemplate("/templates/model-system-prompt.txt",
-                new File(dir, "model-system-prompt.txt"));
-        System.out.println("已在 " + dir.getAbsolutePath() + " 生成:");
-        System.out.println("  " + DEFAULT_CONFIG_NAME + "  （运行设置：维度/过滤/模型等）");
-        System.out.println("  rules.json                （分类关键词数据，按你的文件填写）");
-        System.out.println("  model-system-prompt.txt   （可编辑的模型系统提示词）");
+        // 模板释放逻辑与桌面版共用（Templates）；已存在的文件跳过并提示
+        String[][] files = {
+                {Templates.CONFIG, DEFAULT_CONFIG_NAME, "运行设置：维度/过滤/冲突策略等"},
+                {Templates.MODEL_CONFIG, "model-config.json", "大模型设置：新手只需填 apiKey"},
+                {Templates.RULES, "rules.json", "分类关键词数据，按你的文件填写"},
+                {Templates.SYSTEM_PROMPT, "model-system-prompt.txt", "可编辑的模型系统提示词"},
+        };
+        System.out.println("在 " + dir.getAbsolutePath() + " 生成配置:");
+        for (String[] item : files) {
+            File target = new File(dir, item[1]);
+            boolean written = Templates.extractIfMissing(item[0], target);
+            System.out.println("  " + (written ? "" : "已存在，跳过: ") + item[1]
+                    + "  （" + item[2] + "）");
+        }
         System.out.println("之后执行: categorize report <要分类的目录>");
         return 0;
-    }
-
-    /** init 生成的规则骨架（内置在代码中，避免再维护一份模板文件）。 */
-    static final String DEFAULT_RULES_JSON = "{\n"
-            + "  // 分类规则数据：维度 -> 分类名 -> [文件名中出现任一关键词即命中]。\n"
-            + "  // 关键词不区分大小写；同一维度内按书写顺序取第一个命中的分类。\n"
-            + "  // 维度标识（series/actor/theme）要与 categorize-config.json 的 dimensions 对应。\n"
-            + "  // 下面仅为格式示例，请替换为你自己的分类；也可以全部留空 {}，让模型兜底判断。\n"
-            + "  \"series\": {\n"
-            + "    \"教父系列\": [\"教父\", \"godfather\"],\n"
-            + "    \"指环王系列\": [\"指环王\", \"lord of the rings\"]\n"
-            + "  },\n"
-            + "  \"actor\": {\n"
-            + "    \"阿尔·帕西诺\": [\"帕西诺\", \"pacino\"]\n"
-            + "  },\n"
-            + "  \"theme\": {\n"
-            + "    \"科幻\": [\"科幻\", \"sci-fi\"]\n"
-            + "  }\n"
-            + "}\n";
-
-    private void writeIfAbsent(File target, String content) throws IOException {
-        if (target.exists()) {
-            System.out.println("  已存在，跳过: " + target.getName());
-            return;
-        }
-        java.nio.file.Files.write(target.toPath(),
-                content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-    }
-
-    private void copyTemplate(String resource, File target) throws IOException {
-        if (target.exists()) {
-            System.out.println("  已存在，跳过: " + target.getName());
-            return;
-        }
-        InputStream in = CommandLine.class.getResourceAsStream(resource);
-        if (in == null) {
-            throw new IOException("内置模板缺失: " + resource);
-        }
-        OutputStream out = new java.io.FileOutputStream(target);
-        try {
-            byte[] buffer = new byte[8192];
-            int n;
-            while ((n = in.read(buffer)) != -1) {
-                out.write(buffer, 0, n);
-            }
-        } finally {
-            out.close();
-            in.close();
-        }
     }
 
     private int scan(String[] args) throws Exception {
         File dir = requiredDir(args, 1);
         AppConfig config = loadConfig(args);
-        List<ScannedFile> files = new FileScanner(config).scan(dir);
+        ScanResult scanResult = new FileScanner(config).scanDetailed(dir);
+        List<ScannedFile> files = scanResult.getFiles();
         long totalSize = 0;
         for (ScannedFile f : files) {
             totalSize += f.getSize();
         }
         System.out.println("扫描完成: " + files.size() + " 个文件, 总大小 "
                 + ReportManager.humanSize(totalSize));
+        printScanDiagnostics(scanResult);
         for (ScannedFile f : files) {
             System.out.println("  " + f.getPath());
         }
@@ -156,7 +116,9 @@ public class CommandLine {
         ClassificationEngine engine = new ClassificationEngine(config, buildModelClient(config));
         ReportManager manager = new ReportManager(config, engine);
 
-        List<ScannedFile> files = new FileScanner(config).scan(dir);
+        ScanResult scanResult = new FileScanner(config).scanDetailed(dir);
+        printScanDiagnostics(scanResult);
+        List<ScannedFile> files = scanResult.getFiles();
         CategorizeReport report = manager.build(dir, files);
 
         File json = optionFile(args, "--report", new File(dir, "categorize-report.json"));
@@ -173,6 +135,45 @@ public class CommandLine {
         System.out.println("  Markdown:       " + md.getAbsolutePath());
         System.out.println("检查无误（需要调整就编辑 JSON 的 category/excluded）后执行 apply 即可。");
         return 0;
+    }
+
+    /** 扫描诊断：联接目录/环/无法访问的跳过统计；过滤规则命中数也一并打印，便于核对文件数。 */
+    private static void printScanDiagnostics(ScanResult s) {
+        if (s.getSkippedLinkDirs() > 0) {
+            System.out.println("[警告] 跳过联接/符号链接目录 " + s.getSkippedLinkDirs()
+                    + " 个（内部文件未计入），例如：" + sample(s.getSkippedLinkDirSamples(), 5)
+                    + "；需要扫描请在配置中设 followSymlinks=true");
+        }
+        if (s.getSkippedCycleDirs() > 0) {
+            System.out.println("[警告] 检测到目录环并跳过 " + s.getSkippedCycleDirs()
+                    + " 个：" + sample(s.getCycleSamples(), 5));
+        }
+        if (s.getFailed() > 0) {
+            System.out.println("[警告] 无法访问的文件/目录 " + s.getFailed()
+                    + " 个（路径过长>260/无权限/被占用），例如："
+                    + sample(s.getFailedSamples(), 5));
+        }
+        if (s.getFilteredHidden() + s.getFilteredNames() + s.getFilteredSize()
+                + s.getFilteredExt() > 0) {
+            System.out.println("  过滤: 隐藏 " + s.getFilteredHidden() + " / 忽略名 "
+                    + s.getFilteredNames() + " / 过小 " + s.getFilteredSize()
+                    + " / 扩展名 " + s.getFilteredExt());
+        }
+    }
+
+    private static String sample(List<String> paths, int max) {
+        StringBuilder sb = new StringBuilder();
+        int n = Math.min(max, paths.size());
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                sb.append("；");
+            }
+            sb.append(paths.get(i));
+        }
+        if (paths.size() > n) {
+            sb.append(" 等 ").append(paths.size()).append(" 处");
+        }
+        return sb.toString();
     }
 
     private int apply(String[] args) throws Exception {
@@ -196,19 +197,29 @@ public class CommandLine {
 
         int done = 0;
         int skipped = 0;
+        int kept = 0;
         int failed = 0;
         for (ManifestEntry e : results) {
             if (FileMover.DONE.equals(e.getStatus())) {
                 done++;
             } else if (FileMover.SKIPPED.equals(e.getStatus())) {
                 skipped++;
+            } else if (FileMover.KEPT.equals(e.getStatus())) {
+                kept++;
             } else {
                 failed++;
                 System.out.println("  [失败] " + e.getSourcePath());
             }
         }
-        System.out.println("执行完成: 成功 " + done + ", 跳过 " + skipped + ", 失败 " + failed);
+        System.out.println("执行完成: 成功移动 " + done + ", 未分类保持原位 " + kept
+                + ", 跳过 " + skipped + ", 失败 " + failed);
         System.out.println("操作清单（用于回滚）: " + manifestFile.getAbsolutePath());
+
+        // 与桌面版一致：移动后额外产出结果 Excel（原路径/实际移动后路径/状态）
+        File resultExcel = ExcelReportWriter.resultFileFor(
+                new File(report.getOutputDir()), manifest.getBatchId());
+        new ExcelReportWriter().writeResult(manifest, report, results, resultExcel);
+        System.out.println("结果 Excel: " + resultExcel.getAbsolutePath());
         return failed == 0 ? 0 : 3;
     }
 
@@ -231,52 +242,25 @@ public class CommandLine {
         return result.tampered.isEmpty() && result.failed.isEmpty() ? 0 : 3;
     }
 
-    static final String PROTOCOL_OPENAI = "openai";
-    static final String PROTOCOL_HTTP = "http";
-    static final String PROTOCOL_NONE = "none";
+    static final String PROTOCOL_OPENAI = ModelProtocols.OPENAI;
+    static final String PROTOCOL_HTTP = ModelProtocols.HTTP;
+    static final String PROTOCOL_NONE = ModelProtocols.NONE;
 
     /**
-     * 把配置里的 provider 归一化为内部协议标识：
-     * openai 兼容协议（各家厂商的 OpenAI 兼容网关）或 http 自定义协议；none/空表示不接模型。
+     * 把配置里的 provider 归一化为内部协议标识。
+     * 实际逻辑在 {@link ModelProtocols}（CLI 与 GUI 服务层共用）。
      */
     static String resolveProtocol(String rawProvider) {
-        String p = rawProvider == null ? "" : rawProvider.trim().toLowerCase(java.util.Locale.ROOT);
-        // 火山引擎方舟（Ark / 豆包）走 OpenAI 兼容协议
-        if (p.equals("openai") || p.equals("volcengine") || p.equals("volcano")
-                || p.equals("ark") || p.equals("doubao")
-                || p.equals("火山引擎") || p.equals("火山") || p.equals("方舟") || p.equals("豆包")) {
-            return PROTOCOL_OPENAI;
-        }
-        if (p.equals(PROTOCOL_HTTP)) {
-            return PROTOCOL_HTTP;
-        }
-        if (p.isEmpty() || p.equals(PROTOCOL_NONE) || p.equals("off") || p.equals("disable")) {
-            return PROTOCOL_NONE;
-        }
-        return "";
+        return ModelProtocols.resolveProtocol(rawProvider);
     }
 
     static ModelClient buildModelClient(AppConfig config) {
-        AppConfig.ModelConfig mc = config.getModel();
-        if (!mc.isEnabled()) {
-            return new NullModelClient();
+        List<String> warnings = new ArrayList<String>();
+        ModelClient client = ModelProtocols.build(config, warnings);
+        for (String w : warnings) {
+            System.out.println("[警告] " + w);
         }
-        String protocol = resolveProtocol(mc.getProvider());
-        if (PROTOCOL_HTTP.equals(protocol)) {
-            // 自定义协议：POST {"name":...} → {"hits":[...]}
-            return new HttpModelClient(mc.getEndpoint(), mc.getApiKey(), mc.getApiKeyEnv());
-        }
-        if (PROTOCOL_OPENAI.equals(protocol)) {
-            // OpenAI Chat Completions 兼容协议（OpenAI / 火山方舟 / 通义 / DeepSeek / Ollama 等）
-            return new OpenAIModelClient(mc.getEndpoint(), mc.getModel(),
-                    mc.getApiKey(), mc.getApiKeyEnv(), config.getDimensions(),
-                    mc.getSystemPrompt());
-        }
-        if (!PROTOCOL_NONE.equals(protocol)) {
-            System.out.println("[警告] 无法识别的 model.provider: " + mc.getProvider()
-                    + "，本次不会调用模型。支持：openai（含火山引擎/方舟等 OpenAI 兼容服务）、http、none。");
-        }
-        return new NullModelClient();
+        return client;
     }
 
     /**
@@ -285,54 +269,32 @@ public class CommandLine {
      */
     private static AppConfig loadConfig(String[] args) throws Exception {
         File explicit = option(args, "--config");
-        File configFile = explicit;
-        if (configFile == null) {
-            File inCwd = new File(DEFAULT_CONFIG_NAME).getAbsoluteFile();
-            if (inCwd.isFile()) {
-                configFile = inCwd;
-            }
-        }
+        // 与桌面版一致的查找顺序：--config → 当前目录 → 当前目录 config/ 子目录 → 内置默认
+        File configFile = explicit != null ? explicit
+                : CategorizeService.discoverConfigFile();
         AppConfig config = ConfigLoader.load(configFile);
         if (configFile != null && configFile.isFile()) {
-            config.setRules(Rules.resolve(config, configFile));
-            loadApiKeyFile(config, configFile);
-            loadSystemPromptFile(config, configFile);
+            List<String> warnings = new ArrayList<String>();
+            ConfigFiles.loadAll(config, configFile, warnings);
+            for (String w : warnings) {
+                System.out.println("[警告] " + w);
+            }
         }
         return config;
     }
+
 
     /**
      * 密钥解析：明文 apiKey 为空且配置了 apiKeyFile 时，从本地文件读取（仅注入内存，不落别处）。
      * 文件路径为相对路径时，相对于配置文件所在目录。文件不存在时打印警告，不中断流程。
      */
+    /** 委托 {@link ConfigFiles}（CLI/GUI 共用），告警打印到标准输出。测试依赖此签名。 */
     static void loadApiKeyFile(AppConfig config, File configFile) throws IOException {
-        AppConfig.ModelConfig mc = config.getModel();
-        String fileRef = mc.getApiKeyFile();
-        if (fileRef == null || fileRef.trim().isEmpty()) {
-            return;
+        List<String> warnings = new ArrayList<String>();
+        ConfigFiles.loadApiKeyFile(config, configFile, warnings);
+        for (String w : warnings) {
+            System.out.println("[警告] " + w);
         }
-        if (mc.getApiKey() != null && !mc.getApiKey().trim().isEmpty()) {
-            return; // 明文优先
-        }
-        File keyFile = new File(fileRef.trim());
-        if (!keyFile.isAbsolute()) {
-            keyFile = new File(configFile.getAbsoluteFile().getParentFile(), fileRef.trim());
-        }
-        if (!keyFile.isFile()) {
-            System.out.println("[警告] model.apiKeyFile 指定的密钥文件不存在: " + keyFile.getAbsolutePath());
-            return;
-        }
-        List<String> lines = java.nio.file.Files.readAllLines(keyFile.toPath(),
-                java.nio.charset.StandardCharsets.UTF_8);
-        for (String line : lines) {
-            String key = line.trim();
-            // 忽略空行和 # 注释行；取第一个非注释行为密钥
-            if (!key.isEmpty() && !key.startsWith("#")) {
-                mc.setApiKey(key);
-                return;
-            }
-        }
-        System.out.println("[警告] 密钥文件中没有有效密钥（仅注释/空行）: " + keyFile.getAbsolutePath());
     }
 
     /**
@@ -340,25 +302,12 @@ public class CommandLine {
      * 提示词中可使用 {dimensions} 占位符，运行时替换为配置的维度列表。
      * 文件缺失时打印警告并回退到内置提示词，不中断流程。
      */
+    /** 委托 {@link ConfigFiles}（CLI/GUI 共用），告警打印到标准输出。测试依赖此签名。 */
     static void loadSystemPromptFile(AppConfig config, File configFile) throws IOException {
-        AppConfig.ModelConfig mc = config.getModel();
-        String fileRef = mc.getSystemPromptFile();
-        if (fileRef == null || fileRef.trim().isEmpty()) {
-            return;
-        }
-        File promptFile = new File(fileRef.trim());
-        if (!promptFile.isAbsolute()) {
-            promptFile = new File(configFile.getAbsoluteFile().getParentFile(), fileRef.trim());
-        }
-        if (!promptFile.isFile()) {
-            System.out.println("[警告] model.systemPromptFile 不存在，将使用内置提示词: "
-                    + promptFile.getAbsolutePath());
-            return;
-        }
-        String prompt = new String(java.nio.file.Files.readAllBytes(promptFile.toPath()),
-                java.nio.charset.StandardCharsets.UTF_8).trim();
-        if (!prompt.isEmpty()) {
-            mc.setSystemPrompt(prompt.replace("{dimensions}", String.valueOf(config.getDimensions())));
+        List<String> warnings = new ArrayList<String>();
+        ConfigFiles.loadSystemPromptFile(config, configFile, warnings);
+        for (String w : warnings) {
+            System.out.println("[警告] " + w);
         }
     }
 

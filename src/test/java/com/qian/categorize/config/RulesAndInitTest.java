@@ -79,14 +79,23 @@ class RulesAndInitTest {
 
         File configFile = dir.resolve("categorize-config.json").toFile();
         File rulesFile = dir.resolve("rules.json").toFile();
+        File modelFile = dir.resolve("model-config.json").toFile();
         assertTrue(configFile.exists());
         assertTrue(rulesFile.exists());
+        assertTrue(modelFile.exists());
 
-        // init 出来的文件（带注释）能被直接加载，且 rules 引用生效
+        // init 出来的文件（带注释）能被直接加载，且 rules/model 外部引用都生效
         AppConfig config = ConfigLoader.load(configFile);
         assertEquals(Arrays.asList("series", "actor", "theme"), config.getDimensions());
-        config.setRules(Rules.resolve(config, configFile));
+        java.util.List<String> warnings = new java.util.ArrayList<String>();
+        com.qian.categorize.service.ConfigFiles.loadAll(config, configFile, warnings);
         assertTrue(config.getRules().get("series").containsKey("教父系列"));
+        // 模型配置以 model-config.json 为准（模板里 DeepSeek demo 默认启用）
+        assertTrue(config.getModel().isEnabled());
+        assertEquals("deepseek-flash", config.getModel().getModel());
+        // apiKey 没填时必须给出必填告警
+        assertTrue(warnings.stream().anyMatch(w -> w.contains("apiKey") || w.contains("API Key")),
+                "未填 Key 时应提示必填，实际告警: " + warnings);
 
         // 已存在的文件不覆盖
         Files.write(configFile.toPath(), "{}".getBytes(StandardCharsets.UTF_8));

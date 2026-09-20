@@ -5,6 +5,7 @@ import com.qian.categorize.model.BatchManifest;
 import com.qian.categorize.model.CategorizeReport;
 import com.qian.categorize.model.ManifestEntry;
 import com.qian.categorize.model.ReportEntry;
+import com.qian.categorize.util.Progress;
 
 import java.io.File;
 import java.io.IOException;
@@ -20,12 +21,16 @@ import java.util.UUID;
 /**
  * 按已确认报告执行移动。移动前必须先生成 manifest；
  * 跨磁盘/重命名失败时不留半成品；重复执行支持断点续做（DONE 跳过）。
+ * 未分类（{@link ReportEntry#isUncategorized()}）的文件保持原位不移动，
+ * 以 KEPT 状态记入 manifest（回滚只处理 DONE，KEPT 无需还原）。
  */
 public class FileMover {
 
     public static final String DONE = "DONE";
     public static final String SKIPPED = "SKIPPED";
     public static final String FAILED = "FAILED";
+    /** 未分类保持原位：源路径与目标路径相同，不做任何文件操作。 */
+    public static final String KEPT = "KEPT";
 
     private final AppConfig config;
     private final ConflictStrategy conflictStrategy;
@@ -50,12 +55,41 @@ public class FileMover {
      */
     public List<ManifestEntry> apply(CategorizeReport report, BatchManifest manifest)
             throws IOException {
+        return apply(report, manifest, Progress.NONE);
+    }
+
+    /** 带进度/取消的执行版本：在每个文件之间检查取消标志（当前文件完成后停止，manifest 已落盘）。 */
+    public List<ManifestEntry> apply(CategorizeReport report, BatchManifest manifest,
+                                     Progress progress) throws IOException {
         List<ManifestEntry> results = new ArrayList<ManifestEntry>();
+        int total = report.getEntries().size();
+        int index = 0;
         for (ReportEntry entry : report.getEntries()) {
+            index++;
+            if (progress != null && progress.isCancelled()) {
+                break;
+            }
             if (entry.isExcluded()) {
                 continue;
             }
-            ManifestEntry existing = findDone(manifest, entry.getPath());
+            if (entry.isUncategorized()) {
+                if (progress != null) {
+                    progress.progress(index, total, "未分类，保持原位: " + entry.getName());
+                }
+                // 断点续做时已有 KEPT 记录则直接复用，避免重复登记
+                ManifestEntry kept = findExisting(manifest, entry.getPath(), KEPT);
+                if (kept == null) {
+                    kept = new ManifestEntry(entry.getPath(), entry.getPath(),
+                            entry.getSize(), "", KEPT);
+                    manifest.getEntries().add(kept);
+                }
+                results.add(kept);
+                continue;
+            }
+            if (progress != null) {
+                progress.progress(index, total, "正在移动: " + entry.getName());
+            }
+            ManifestEntry existing = findExisting(manifest, entry.getPath(), DONE);
             if (existing != null) {
                 results.add(existing);
                 continue;
@@ -117,9 +151,9 @@ public class FileMover {
         return results;
     }
 
-    private ManifestEntry findDone(BatchManifest manifest, String sourcePath) {
+    private ManifestEntry findExisting(BatchManifest manifest, String sourcePath, String status) {
         for (ManifestEntry e : manifest.getEntries()) {
-            if (sourcePath.equals(e.getSourcePath()) && DONE.equals(e.getStatus())) {
+            if (sourcePath.equals(e.getSourcePath()) && status.equals(e.getStatus())) {
                 return e;
             }
         }
@@ -145,10 +179,10 @@ public class FileMover {
         return candidate;
     }
 
-    /** 分类名里的非法路径字符替换掉。 */
-    static String sanitize(String category) {
+    /** 分类名里的非法路径字符替换掉。报告/结果 Excel 计算预计目标路径时也共用此规则。 */
+    public static String sanitize(String category) {
         if (category == null || category.trim().isEmpty()) {
-            return "未分类";
+            return ReportEntry.UNCATEGORIZED;
         }
         return category.replaceAll("[/\\\\:*?\"<>|\\x00-\\x1F]", "_").trim();
     }

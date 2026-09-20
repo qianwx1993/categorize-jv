@@ -38,6 +38,12 @@
             <artifactId>log4j-core</artifactId>
             <version>2.21.1</version>
         </dependency>
+        <!-- 桌面界面现代外观主题，支持 JDK 8；无界面的 CLI 路径不触发加载 -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>3.4.1</version>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -60,4 +66,173 @@
             </plugin>
         </plugins>
     </build>
+
+    <!--
+      exe 打包：mvn -P exe package
+      产物 target/exe-dist/：categorize.exe + categorize.jar(fat jar) + jre8/（内置运行时）
+      + config/（categorize-config.json / model-config.json / rules.json / 提示词，供用户编辑），
+      另出 target/categorize-jv-*-exe-dist.zip 绿色分发包。
+    -->
+    <profiles>
+        <profile>
+            <id>exe</id>
+            <build>
+                <plugins>
+                    <!-- 1. 打 fat jar（合并 META-INF/services：POI/Jackson/Log4j 都依赖服务发现） -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <version>3.5.3</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>shade</goal>
+                                </goals>
+                                <configuration>
+                                    <createDependencyReducedPom>false</createDependencyReducedPom>
+                                    <outputFile>${project.build.directory}/exe-dist/categorize.jar</outputFile>
+                                    <transformers>
+                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                            <mainClass>com.qian.categorize.Application</mainClass>
+                                        </transformer>
+                                    </transformers>
+                                    <filters>
+                                        <filter>
+                                            <artifact>*:*</artifact>
+                                            <excludes>
+                                                <exclude>META-INF/*.SF</exclude>
+                                                <exclude>META-INF/*.DSA</exclude>
+                                                <exclude>META-INF/*.RSA</exclude>
+                                            </excludes>
+                                        </filter>
+                                    </filters>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- 2. 用 Launch4j 把 fat jar 包成 Windows GUI 程序（无命令行黑窗） -->
+                    <plugin>
+                        <groupId>com.akathist.maven.plugins.launch4j</groupId>
+                        <artifactId>launch4j-maven-plugin</artifactId>
+                        <version>2.5.1</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>launch4j</goal>
+                                </goals>
+                                <configuration>
+                                    <headerType>gui</headerType>
+                                    <outfile>${project.build.directory}/exe-dist/categorize.exe</outfile>
+                                    <dontWrapJar>true</dontWrapJar>
+                                    <!-- 运行时相对 exe 同目录找 jar（build 时由 mojo 按 outfile 同级校验） -->
+                                    <jar>categorize.jar</jar>
+                                    <!-- 工作目录固定为 exe 所在目录，配置文件随 exe 走（便携） -->
+                                    <chdir>.</chdir>
+                                    <jre>
+                                        <path>jre8</path>
+                                        <requires64Bit>true</requires64Bit>
+                                        <minVersion>1.8.0</minVersion>
+                                        <requiresJdk>false</requiresJdk>
+                                        <!-- Windows 控制台默认 GBK，强制 UTF-8 防中文乱码 -->
+                                        <opts>
+                                            <opt>-Dfile.encoding=UTF-8</opt>
+                                        </opts>
+                                    </jre>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- 3. 复制构建机当前使用的 JRE 到 jre8/，目标机器免装 Java -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>copy-bundled-jre</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/exe-dist/jre8</outputDirectory>
+                                    <overwrite>true</overwrite>
+                                    <resources>
+                                        <resource>
+                                            <directory>${java.home}</directory>
+                                            <filtering>false</filtering>
+                                            <excludes>
+                                                <!-- JDK8 该文件只读（二次构建覆盖会 AccessDenied），
+                                                     且仅为类数据共享启动缓存，缺失不影响运行 -->
+                                                <exclude>**/classes.jsa</exclude>
+                                            </excludes>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- 4. 随包分发可编辑配置：模板原样复制到 exe 同目录 config/（保留注释，只取需要的文件） -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>copy-config-dir</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/exe-dist/config</outputDirectory>
+                                    <overwrite>true</overwrite>
+                                    <resources>
+                                        <resource>
+                                            <directory>src/main/resources/templates</directory>
+                                            <filtering>false</filtering>
+                                            <includes>
+                                                <include>categorize-config.json</include>
+                                                <include>model-config.json</include>
+                                                <include>rules.json</include>
+                                                <include>model-system-prompt.txt</include>
+                                            </includes>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- 5. 打成绿色 zip 分发 -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <version>3.6.0</version>
+                        <executions>
+                            <execution>
+                                <id>zip-exe-dist</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                                <configuration>
+                                    <descriptors>
+                                        <descriptor>src/assembly/exe-dist.xml</descriptor>
+                                    </descriptors>
+                                    <appendAssemblyId>true</appendAssemblyId>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

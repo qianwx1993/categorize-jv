@@ -20,6 +20,11 @@ target/
 # 模型 API 密钥和自定义系统提示词文件（本地私有，禁止提交）
 model-api-key.txt
 model-system-prompt.txt
+# model-config.json 里可能直接填了明文 apiKey，本地副本禁止提交
+model-config.json
 *.key
 *api-key*.txt
 *system-prompt*.txt
+# 例外：随 jar 分发的内置模板需要提交
+!src/main/resources/templates/model-system-prompt.txt
+!src/main/resources/templates/model-config.json

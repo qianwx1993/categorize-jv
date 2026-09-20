@@ -38,9 +38,19 @@ public class AppConfig {
     /** RENAME / SKIP / OVERWRITE */
     private String conflictStrategy = "RENAME";
     private boolean cleanEmptyDirs = false;
+    /**
+     * 是否跟随符号链接/目录联接（Windows junction）进入扫描。默认关闭以防环和误入系统目录；
+     * 库文件通过联接挂到其他盘时需要打开。打开后按真实路径去环。
+     */
+    private boolean followSymlinks = false;
     private double lowConfidenceThreshold = 0.7d;
-    /** 独立规则文件路径（相对路径相对于配置文件所在目录）；文件存在时优先于内联 rules */
+    /** 独立规则文件路径（相对路径相对于配置文件所在目录）；文件存在时整体替换内联 rules */
     private String rulesFile = "";
+    /**
+     * 独立模型配置文件（如 model-config.json；相对路径相对于主配置文件所在目录，桌面版在 config/ 子目录）。
+     * 文件存在时整体替换内联 model 节点；程序保存主配置时不写/覆盖该文件，供用户直接编辑并保留注释。
+     */
+    private String modelFile = "";
     /** 维度 -> (分类名 -> 文件名命中关键词列表)，顺序不影响（优先级只看 dimensions） */
     private Map<String, Map<String, List<String>>> rules =
             new LinkedHashMap<String, Map<String, List<String>>>();
@@ -114,6 +124,14 @@ public class AppConfig {
         return cleanEmptyDirs;
     }
 
+    public boolean isFollowSymlinks() {
+        return followSymlinks;
+    }
+
+    public void setFollowSymlinks(boolean followSymlinks) {
+        this.followSymlinks = followSymlinks;
+    }
+
     public void setCleanEmptyDirs(boolean cleanEmptyDirs) {
         this.cleanEmptyDirs = cleanEmptyDirs;
     }
@@ -132,6 +150,14 @@ public class AppConfig {
 
     public void setRulesFile(String rulesFile) {
         this.rulesFile = rulesFile;
+    }
+
+    public String getModelFile() {
+        return modelFile;
+    }
+
+    public void setModelFile(String modelFile) {
+        this.modelFile = modelFile;
     }
 
     public Map<String, Map<String, List<String>>> getRules() {
@@ -166,7 +192,7 @@ public class AppConfig {
         private String apiKeyFile = "";
         /** 自定义系统提示词文件：相对路径相对于配置文件所在目录；留空用内置提示词。支持 {dimensions} 占位符 */
         private String systemPromptFile = "";
-        /** 运行时从 systemPromptFile 读入的提示词，不要求写在配置 JSON 中 */
+        /** 运行时从 systemPromptFile 读入的提示词，仅存内存，不写回配置 JSON */
         private String systemPrompt = "";
 
         public boolean isEnabled() {
@@ -233,6 +259,8 @@ public class AppConfig {
             this.systemPromptFile = systemPromptFile;
         }
 
+        /** 运行时从文件读入的提示词仅存内存；保存配置时不写回 JSON。 */
+        @com.fasterxml.jackson.annotation.JsonIgnore
         public String getSystemPrompt() {
             return systemPrompt;
         }

@@ -109,7 +109,15 @@ mvn package
 
 # 安装到本地 Maven 仓库
 mvn install
+
+# 打 Windows 绿色包：target/exe-dist/（exe + fat jar + 内置 jre8）+ zip
+mvn -P exe package
 ```
+
+- 无参数启动进入 Swing 桌面界面（`com.qian.categorize.ui` 包，FlatLaf 主题），
+  带参数启动走原 CLI；编排逻辑统一在 `com.qian.categorize.service.CategorizeService`。
+- exe 用 Launch4j（gui 模式、`<chdir>.</chdir>`、强制 UTF-8）；fat jar 用 maven-shade
+  合并 `META-INF/services`；JRE 拷贝排除只读的 `**/classes.jsa`。详见 `docs/桌面版使用与打包.md`。
 
 注意：本机 `mvn` 默认运行在 JDK 8 上；如需用更高版本 JDK 构建，显式指定：
 
